@@ -1,12 +1,11 @@
 # License Plate Reader
 The main assumption of the project is to create an algorithm that returns the number plate in text form from the photo.
-
 Project written in Python, using the Keras and OpenCV library.  
 
 ## Issuses
-[ ] The car's photo database is currently too small and the model is not able to accurately indicate the location of the car registration.
-[ ] The algorithm does not always correctly divide the picture into individual characters.
-[ ] Incorrect character predictions occur.
+- [ ] The car's photo database is currently too small and the model is not able to accurately indicate the location of the car registration.
+- [ ] The algorithm does not always correctly divide the picture into individual characters.
+- [ ] Incorrect character predictions occur.
 
 ## Car photo
 The following license plate is modified and is fake :trollface:
