@@ -11,12 +11,12 @@ def split(img):
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
     gray = cv2.equalizeHist(gray)
 
-    _, thresh = cv2.threshold(gray, 70, 255, cv2.THRESH_BINARY_INV)
-    dilate = cv2.dilate(thresh, np.ones((3, 3), np.uint8), 2)
-    erode = cv2.erode(dilate, np.ones((3, 3), np.uint8), 1)
+    _, thresh = cv2.threshold(gray, 70, 255, cv2.THRESH_BINARY)
+    erode = cv2.erode(thresh, np.ones((3, 3), np.uint8), 2)
+    dilate = cv2.dilate(erode, np.ones((3, 3), np.uint8), 1)
 
-    _, conts, _ = cv2.findContours(erode, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-    cv2.imshow('ba', erode)
+    _, conts, _ = cv2.findContours(dilate, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    cv2.imshow('ba', dilate)
     signs = []
 
     for con in conts:
@@ -64,7 +64,7 @@ def transform(img, points):
 
 
 
-cars = np.load(os.path.join(data_path, 'arrays', 'cars.npy'))[2:8]
+cars = np.load(os.path.join(data_path, 'arrays', 'cars.npy'))[95:150]
 
 
 i = 0

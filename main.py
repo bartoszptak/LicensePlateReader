@@ -20,44 +20,43 @@ def split(img):
     gray = cv2.equalizeHist(gray)
 
     _, thresh = cv2.threshold(gray, 70, 255, cv2.THRESH_BINARY)
-    erode = cv2.erode(thresh, np.ones((3, 3), np.uint8), 1)
+    erode = cv2.erode(thresh, np.ones((3, 3), np.uint8), 2)
+    dilate = cv2.dilate(erode, np.ones((3, 3), np.uint8), 1)
 
-    _, conts, _ = cv2.findContours(erode, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
+    _, conts, _ = cv2.findContours(dilate, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    cv2.imshow('ba', dilate)
     signs = []
 
-    for i, con in enumerate(conts):
+    for con in conts:
         area = cv2.contourArea(con)
-        if 1000 < area < 5000:
+        if area > 100:
             M = cv2.moments(con)
             cx = int(M['m10'] / M['m00'])
-            frag = erode[5:95, cx - 25:cx + 25]
+            mini, maxi = cx - 25, cx + 25
+            if mini < 0:
+                mini, maxi = 0, 50
+            elif maxi > erode.shape[1]:
+                mini, maxi = erode.shape[1]-50, erode.shape[1]
+            frag = erode[5:95, mini:maxi]
             y, x = frag.shape
-            if y > 0 and x > 00:
-                signs.append((frag, cx, area))
+            if y > 0 and x > 0:
+                signs.append([frag, cx, area])
 
-    if len(signs) > 3:
+    if len(signs) > 1:
         signs = sorted(signs, key=lambda a_entry: a_entry[1])
-        global z
+
         aha = []
-        i = 0
-        while i < len(signs) - 1:
-            if signs[i + 1][1] - signs[i][1] < 20:
-                if signs[i][2] > signs[i + 1][2]:
-                    aha.append(signs[i])
-                    i += 1
-            else:
-                aha.append(signs[i])
-            i += 1
-
-        if abs(signs[len(signs) - 1][1] - signs[len(signs) - 2][1]) > 10:
-            aha.append(signs[len(signs) - 1])
-
-        for a in aha:
-            cv2.imwrite('./data/chars/new/'+str(z)+'.jpg',a[0])
-            z+=1
+        j = 1
+        old = signs[0]
+        aha.append(old)
+        while j < len(signs):
+            if signs[j][1]-old[1] > 30:
+                aha.append(signs[j])
+                old = signs[j]
+            j += 1
         return aha
 
+    print('nie odczytałem')
     return None
 
 
@@ -126,7 +125,7 @@ def car_predict(img):
 
 
 def main():
-    its = np.load('data/arrays/cars.npy')
+    its = np.load('data/arrays/cars_only_new.npy')
     for i,it in enumerate(its):
         frame = it[0]
         K = [it[1], it[2], it[3], it[4], it[5], it[6], it[7], it[8]]

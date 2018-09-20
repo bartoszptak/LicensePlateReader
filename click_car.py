@@ -40,5 +40,6 @@ if os.path.isfile(os.path.join(data_path, 'arrays', 'cars.npy')):
     new_array = old_array.tolist() + array
     print(len(new_array))
     np.save(os.path.join(data_path, 'arrays', 'cars'), new_array)
+    np.save(os.path.join(data_path, 'arrays', 'cars_only_new'), array)
 else:
     np.save(os.path.join(data_path, 'arrays', 'cars'), array)
