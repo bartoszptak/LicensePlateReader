@@ -1,6 +1,7 @@
 # License Plate Reader
-The main assumption of the project is to create an algorithm that returns the number plate in text form from the photo.
-Project written in Python, using the Keras and OpenCV library.  
+The main assumption of the project is to create an algorithm return the plate charakters in string form from the photo.
+
+The project was written in Python, using the Keras and OpenCV library.  
 
 ## Issuses
 - [ ] The car's photo database is currently too small and the model is not able to accurately indicate the location of the car registration.
