@@ -1,5 +1,5 @@
 # License Plate Reader
-The main assumption of the project is to create an algorithm that return the plate charakters in string form from the photo.
+The main assumption of the project is to create an algorithm that return the plate charakters in text form from the photo.
 
 The project was written in Python, using the Keras and OpenCV library.  
 
