@@ -6,7 +6,7 @@ The project was written in Python, using the Keras and OpenCV library.
 ## Issuses
 - [ ] The car's photo database is currently too small and the model is not able to accurately indicate the location of the car registration.
 - [ ] The algorithm does not always correctly divide the picture into individual characters.
-- [ ] Incorrect character predictions occur.
+- [ ] Sometimes the model incorrectly predicts characters.
 
 ## Car photo
 The following license plate is modified and is fake :trollface:
