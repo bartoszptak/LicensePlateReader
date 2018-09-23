@@ -133,6 +133,14 @@ def plates_cut():
         split(plate)
 
 
+def draw_points(frame, K):
+    cv2.circle(frame, (int(K[0]),int(K[1])), 3, (0,0,255), -1)
+    cv2.circle(frame, (int(K[2]),int(K[3])), 3, (0,0,255), -1)
+    cv2.circle(frame, (int(K[4]),int(K[5])), 3, (0,0,255), -1)
+    cv2.circle(frame, (int(K[6]),int(K[7])), 3, (0,0,255), -1)
+    return frame
+
+
 def check_files():
     if not os.path.isfile(os.path.join('data', 'models', 'cars')):
         print('Path: "'+str(os.path.join('data', 'models', 'cars'))+'" - file not found')
@@ -178,10 +186,7 @@ def main():
     K = car_predict(frame)
 
     plate = transform(frame, K)
-    cv2.circle(frame, (int(K[0]),int(K[1])), 3, (0,0,255), -1)
-    cv2.circle(frame, (int(K[2]),int(K[3])), 3, (0,0,255), -1)
-    cv2.circle(frame, (int(K[4]),int(K[5])), 3, (0,0,255), -1)
-    cv2.circle(frame, (int(K[6]),int(K[7])), 3, (0,0,255), -1)
+    frame = draw_points(frame, K)
     chars = split(plate)
     if chars is not None:
         show(frame, plate, chars)
