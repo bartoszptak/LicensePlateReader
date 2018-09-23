@@ -2,6 +2,8 @@ import numpy as np
 import cv2
 from keras.models import load_model
 import os
+import argparse
+import sys
 
 div = 10
 div2 = 1
@@ -124,24 +126,6 @@ def car_predict(img):
             int(K[0][7])]
 
 
-def main():
-    its = np.load('data/arrays/cars_only_new.npy')
-    for i,it in enumerate(its):
-        frame = it[0]
-        K = [it[1], it[2], it[3], it[4], it[5], it[6], it[7], it[8]]
-
-
-        frame = cv2.resize(frame, (1280, 720))
-        #K = car_predict(test_img)
-
-        plate = transform(frame, K)
-        chars = split(plate)
-        if chars is not None:
-            show(frame, plate, chars)
-            print(i)
-    cv2.destroyAllWindows()
-
-
 def plates_cut():
     table = np.load('data/arrays/cars.npy')
     for it in table:
@@ -149,5 +133,62 @@ def plates_cut():
         split(plate)
 
 
-main()
+def check_files():
+    if not os.path.isfile(os.path.join('data', 'models', 'cars')):
+        print('Path: "'+str(os.path.join('data', 'models', 'cars'))+'" - file not found')
+        sys.exit()
+    if not os.path.isfile(os.path.join('data', 'models', 'chars')):
+        print('Path: "'+str(os.path.join('data', 'models', 'chars'))+'" - file not found')
+        sys.exit()
+    if not os.path.isfile(os.path.join('data', 'weights', 'cars')):
+        print('Path: "'+str(os.path.join('data', 'weights', 'cars'))+'" - file not found')
+        sys.exit()
+    if not os.path.isfile(os.path.join('data', 'weights', 'chars')):
+        print('Path: "'+str(os.path.join('data', 'weights', 'chars'))+'" - file not found')
+        sys.exit()
+
+
+def my_parser():
+    parser = argparse.ArgumentParser(description='Tutaj możemy podać zwięzły opis naszego skryptu')
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('-v', '--video', help="Capture number", type=int)
+    group.add_argument('-i', '--image', help="Image Path", type=str)
+    return parser
+
+
+def main():
+    check_files()
+    parser = my_parser()
+    args = parser.parse_args()
+
+    if args.video is not None:
+        cap = cv2.VideoCapture(args.video)
+        ret, frame = cap.read()
+        if ret is None:
+            print('Bad camera number')
+            sys.exit()
+    elif args.image is not None:
+        if os.path.isfile(args.image):
+            frame = cv2.imread(args.image)
+    else:
+        print(args)
+        sys.exit()
+
+    frame = cv2.resize(frame, (1280, 720))
+    K = car_predict(frame)
+
+    plate = transform(frame, K)
+    cv2.circle(frame, (int(K[0]),int(K[1])), 3, (0,0,255), -1)
+    cv2.circle(frame, (int(K[2]),int(K[3])), 3, (0,0,255), -1)
+    cv2.circle(frame, (int(K[4]),int(K[5])), 3, (0,0,255), -1)
+    cv2.circle(frame, (int(K[6]),int(K[7])), 3, (0,0,255), -1)
+    chars = split(plate)
+    if chars is not None:
+        show(frame, plate, chars)
+    cv2.destroyAllWindows()
+
+
+if __name__ == '__main__':
+    main()
+
 
