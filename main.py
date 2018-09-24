@@ -126,13 +126,6 @@ def car_predict(img):
             int(K[0][7])]
 
 
-def plates_cut():
-    table = np.load('data/arrays/cars.npy')
-    for it in table:
-        plate = transform(it[0], [it[1], it[2], it[3], it[4], it[5], it[6], it[7], it[8]])
-        split(plate)
-
-
 def draw_points(frame, K):
     cv2.circle(frame, (int(K[0]),int(K[1])), 3, (0,0,255), -1)
     cv2.circle(frame, (int(K[2]),int(K[3])), 3, (0,0,255), -1)
