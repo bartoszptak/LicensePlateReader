@@ -4,8 +4,9 @@ import numpy as np
 import os
 
 data_path = 'data'
+NAME = 'norm1'
 
-imgs = glob.glob(os.path.join(data_path, 'cars', 'new', '*'))
+imgs = glob.glob(os.path.join(data_path, 'cars', NAME, '*'))
 
 array = []
 
@@ -35,11 +36,9 @@ while i < imgs.__len__():
     print(imgs.__len__() - i)
     i += 1
 
-if os.path.isfile(os.path.join(data_path, 'arrays', 'cars.npy')):
-    old_array = np.load(os.path.join(data_path, 'arrays', 'cars.npy'))
+if os.path.isfile(os.path.join(data_path, 'cars', NAME+'.npy')):
+    old_array = np.load(os.path.join(data_path, 'cars', NAME+'cars.npy'))
     new_array = old_array.tolist() + array
-    print(len(new_array))
-    np.save(os.path.join(data_path, 'arrays', 'cars'), new_array)
-    np.save(os.path.join(data_path, 'arrays', 'cars_only_new'), array)
+    np.save(os.path.join(data_path, 'cars', NAME), new_array)
 else:
-    np.save(os.path.join(data_path, 'arrays', 'cars'), array)
+    np.save(os.path.join(data_path, 'cars', NAME), array)
