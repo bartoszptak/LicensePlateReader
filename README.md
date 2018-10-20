@@ -1,3 +1,5 @@
+<strong> Note: The development of the project has been suspended for an indefinite period. </strong>
+
 # License Plate Reader
 The main assumption of the project is to create an algorithm that return the plate characters in text form from the photo.
 
