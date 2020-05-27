@@ -4,6 +4,7 @@ import os
 from typing import Tuple, List
 from scipy.spatial.distance import cdist
 import string
+import imutils
 
 
 class PlateReader:
@@ -56,8 +57,7 @@ class PlateReader:
             car license plate numbers
         """
 
-        pkt = np.zeros((4, 2))
-        plate = np.zeros((400, 321), dtype=np.uint8)
+        plate, pkt = self.get_plate_from_image(img)
 
         pkt = self.order_points(pkt)
         plate = self.normalize_plate_size(plate, pkt)
@@ -65,9 +65,68 @@ class PlateReader:
 
         chars, dists = self.split_plate_to_chars(plate)
         predicted = self.predict_chars(chars, dists)
+
         result = self.check_character_dependencies(predicted)
 
         return result
+
+    def get_plate_from_image(self, img: np.ndarray):
+        img = cv2.resize(img, (1280, 720))
+        gray_org = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        gray_org = cv2.bilateralFilter(gray_org, 11, 17, 17)
+        screenCnt = None
+
+        cannies = [30, 50, 80]
+        approxies = np.arange(0.014, 0.020, 0.002)
+        scales = [1.0, 0.8, 0.5]
+
+        cannies_c = 0
+        approxies_c = 0
+        scales_c = 0
+
+        scale = None
+
+        while screenCnt is None:
+            gray = cv2.resize(
+                gray_org, None, fx=scales[scales_c], fy=scales[scales_c]).copy()
+            edged = cv2.Canny(gray, cannies[cannies_c], 200)
+            cnts = cv2.findContours(
+                edged.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            cnts = imutils.grab_contours(cnts)
+            cnts = sorted(cnts, key=cv2.contourArea, reverse=True)[:10]
+
+            for c in cnts:
+                approx = cv2.approxPolyDP(
+                    c, approxies[approxies_c] * cv2.arcLength(c, True), True)
+                if len(approx) == 4:
+                    screenCnt = approx[:, 0]
+                    scale = scales[scales_c]
+                    break
+
+            approxies_c += 1
+
+            if approxies_c >= len(approxies):
+                approxies_c = 0
+                cannies_c += 1
+
+            if cannies_c >= len(cannies):
+                approxies_c = 0
+                cannies_c = 0
+                scales_c += 1
+
+            if scales_c >= len(scales):
+                break
+
+        if screenCnt is None:
+            screenCnt = np.zeros((4, 2))
+            new_image = np.zeros((400, 321), dtype=np.uint8)
+        else:
+            gray = cv2.resize(gray_org, None, fx=scale, fy=scale).copy()
+            mask = np.zeros(gray.shape, np.uint8)
+            new_image = cv2.drawContours(mask, [screenCnt], 0, 255, -1,)
+            new_image = cv2.bitwise_and(gray, gray, mask=mask)
+
+        return new_image, screenCnt
 
     @staticmethod
     def order_points(pts: np.ndarray) -> np.ndarray:
@@ -169,7 +228,7 @@ class PlateReader:
         dists = [0]
 
         for i, ctr in enumerate(conts):
-            if cv2.contourArea(ctr) > 1000:
+            if cv2.contourArea(ctr) > 900:
                 x, y, w, h = cv2.boundingRect(ctr)
 
                 roi = plate[y-1:y+h+1, x-1:x+w+1]
@@ -217,12 +276,12 @@ class PlateReader:
 
         plate = []
         flag = True
-        for iaaa, d in zip(res.T[-7:], dists[-7:]):
-            if flag:
+        for i, (ch, d) in enumerate(zip(res.T[-7:], dists[-7:])):
+            if (flag and i > 2) or i < 3:
                 flag = d < 85
 
             plate.append({
-                'char': chars[iaaa.argmin()].upper(),
+                'char': self.char_targets[ch.argmin()].upper(),
                 'left': flag
             })
 
