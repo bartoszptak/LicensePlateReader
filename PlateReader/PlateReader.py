@@ -1,3 +1,7 @@
+"""
+    Author: Bartosz Ptak
+
+"""
 import numpy as np
 import cv2
 import os
@@ -12,10 +16,25 @@ class PlateReader:
     """
 
     def __init__(self) -> None:
-        """Class constructor
+        """Class constructor for image processing. Requires defining some constants for the problem.
+
+        Elements
+        ----------
+        plate_size
+            This is the size of the license plates (official size in mm), default 520x114 mm
+        plate_numbers
+
+        char_size
+            The size of one character to which each of them will be normalized
+        char_base
+            Character pattern generated from arklatrs.ttf font for char_size 50x100
+        dep_right
+            Restrictions resulting from restrictions on the possibility of the char being
+            abbreviated as a region
         """
 
         self.plate_size = (520, 114)
+        self.plate_numbers = 7
         self.dst_matrix = np.array(
             [
                 [0, 0],
@@ -218,6 +237,17 @@ class PlateReader:
             Splitted chars images
         np.ndarray
             Distances between chars
+
+        The function uses contour search. Then they are sorted from those with the largest area.
+        Then iteration over the detected contours occurs and if they have sufficient surface area,
+        they are processed:
+            1. Create ROI
+            2. Scale ROI
+            3. Erosion to get rid of outliers
+            4. Binarization
+            5. Crop the char to the image size
+            6. Re-binarization
+            7. Calculate the center of the contour
         """
 
         conts, _ = cv2.findContours(
@@ -269,6 +299,10 @@ class PlateReader:
         -------
         List
             List of dicts like {'char': 'P, 'left' True}. Left is true if the char is befor the sticker
+
+        Algorithm:
+             - Calculates the cosine similarity between input and pattern.
+             - Checks if the character is a character describing the region.
         """
 
         res = cdist(self.char_base, chars.reshape(
@@ -276,7 +310,7 @@ class PlateReader:
 
         plate = []
         flag = True
-        for i, (ch, d) in enumerate(zip(res.T[-7:], dists[-7:])):
+        for i, (ch, d) in enumerate(zip(res.T[-self.plate_numbers:], dists[-self.plate_numbers:])):
             if (flag and i > 2) or i < 3:
                 flag = d < 85
 
@@ -299,7 +333,7 @@ class PlateReader:
         Returns
         -------
         str
-            String with a length of 7
+            String with a length of self.plate_numbers
         """
 
         results = ''
@@ -311,4 +345,4 @@ class PlateReader:
             else:
                 results += p['char']
 
-        return results.ljust(7, '_')
+        return results.ljust(self.plate_numbers, '_')
