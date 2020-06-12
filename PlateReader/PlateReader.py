@@ -47,8 +47,8 @@ class PlateReader:
         self.char_tresh = 80
         self.char_targets = sorted(string.ascii_lowercase+string.digits)
         self.char_base = np.load(
-            os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(
-                __file__))), 'data', 'chars_templates.npy'),
+            os.path.join(os.path.dirname(os.path.realpath(
+                __file__)), 'chars_templates.npy'),
             allow_pickle=True).reshape(
                 len(self.char_targets),
                 np.multiply(*self.char_size))
