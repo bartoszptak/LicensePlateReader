@@ -93,9 +93,10 @@ class PlateReader:
         img = cv2.resize(img, (1280, 720))
         gray_org = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         gray_org = cv2.bilateralFilter(gray_org, 11, 17, 17)
+
         screenCnt = None
 
-        cannies = [30, 50, 80]
+        cannies = [10, 30, 50, 80]
         approxies = np.arange(0.014, 0.020, 0.002)
         scales = [1.0, 0.8, 0.5]
 
@@ -108,7 +109,7 @@ class PlateReader:
         while screenCnt is None:
             gray = cv2.resize(
                 gray_org, None, fx=scales[scales_c], fy=scales[scales_c]).copy()
-            edged = cv2.Canny(gray, cannies[cannies_c], 200)
+            edged = cv2.Canny(gray, cannies[cannies_c], 180)
             cnts = cv2.findContours(
                 edged.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
             cnts = imutils.grab_contours(cnts)
@@ -117,7 +118,7 @@ class PlateReader:
             for c in cnts:
                 approx = cv2.approxPolyDP(
                     c, approxies[approxies_c] * cv2.arcLength(c, True), True)
-                if len(approx) == 4:
+                if len(approx) == 4 and cv2.contourArea(c) > 10000:
                     screenCnt = approx[:, 0]
                     scale = scales[scales_c]
                     break
