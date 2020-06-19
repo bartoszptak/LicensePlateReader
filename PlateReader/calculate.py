@@ -17,6 +17,7 @@ def check(res: dict, gt: dict) -> None:
 
     points = 0
     count = 0
+    readed = len(res.items())-1
 
     for key, val in res.items():
         val_gt = gt.get(key, -1)
@@ -24,6 +25,9 @@ def check(res: dict, gt: dict) -> None:
         if val_gt == -1:
             print(f'No find {key} in ground truth - skipping')
             continue
+
+        if val == '???????':
+            readed -= 1
 
         if len(val) != len(val_gt):
             count += len(val_gt)
@@ -40,6 +44,9 @@ def check(res: dict, gt: dict) -> None:
     try:
         print(
             f'Accurancy: {points/count:2f} ({points} good chars per {count} total)')
+        print(
+            f'Find acc: {readed/(len(res.items())-1):2f} ({readed} readed plates for {(len(res.items())-1)} total)'
+        )
     except ZeroDivisionError:
         print(f'Accurancy: {0.00} ({points} good chars per {count} total)')
 

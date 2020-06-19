@@ -1,6 +1,23 @@
 """
-    Author: Bartosz Ptak
+    Author: Bartosz Ptak - 2020
 
+    It is a project for the subject of Vision Systems conducted at the Poznan 
+    University of Technology, specializing in Robots and Autonomous Systems.
+
+    Task:
+        Writing a program without using machine learning:
+            - find car plates in the image
+            - read the marks on them
+
+    Assumptions:
+        - law in Poland
+        - boards with only 7 characters
+        - images for max. 45 degrees
+
+    Final results on private test set:
+        - Find bbox accurancy: 87.50% (42 readed plates for 48 total)
+        - Total accurancy: 83.97% (288 good chars per 343 total)
+        - Execution time: 10.32s (per 48 images)
 """
 import numpy as np
 import cv2
@@ -14,7 +31,17 @@ import imutils
 
 
 class PlateReader:
-    """[summary]
+    """Class to search for license plates and to describe them.
+
+    Example:
+        import cv2
+        from PlateReader import PlateReader
+
+        pr = PlateReader()
+
+        img = cv2.imread('path_to_image.png')
+        plate_chars = pr.read(img)
+        print(plate_chars)
     """
 
     def __init__(self) -> None:
@@ -84,16 +111,7 @@ class PlateReader:
             plate, pkt = self.get_plate_from_image2(img)
 
             if plate is None:
-                # print('Żadna z nich')
                 return self.check_character_dependencies([])
-        #     else:
-
-        #         print('Metoda 2')
-        # else:
-        #     print('Metoda 1')
-        
-        # cv2.imshow('a', plate)
-        # cv2.waitKey(0)
 
         pkt = self.order_points(pkt)
         plate = self.normalize_plate_size(plate, pkt)
@@ -106,51 +124,72 @@ class PlateReader:
 
         return result
 
+    @staticmethod
+    def try_get_contour(gray_org, region):
+        try:
+            eq = gray_org[region[0]-5:region[2]+5, region[1]-5:region[3]+5]
+
+            edged = cv2.Canny(eq, 80, 200, apertureSize=3)
+            edged = cv2.morphologyEx(
+                edged, cv2.MORPH_CLOSE, np.ones((3, 3), dtype=np.float32))
+            cnts = cv2.findContours(
+                edged.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            cnts = imutils.grab_contours(cnts)
+            cnts = sorted(cnts, key=cv2.contourArea, reverse=True)
+
+            screenCnt = None
+
+            for c in cnts:
+                approx = cv2.approxPolyDP(
+                    c, 0.010 * cv2.arcLength(c, True), True)
+                if len(approx) == 4 and cv2.contourArea(c) > 2000:
+                    screenCnt = approx[:, 0]
+                    break
+
+            return eq, screenCnt
+        except:
+            return None, None
+
     def get_plate_from_image(self, img: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        img = cv2.resize(img, (1280, 960))
+        """This is the first method of searching for car registrations. Fast and quite effective.
+
+        Parameters
+        ----------
+        img : np.ndarray
+            Imput image
+
+        Returns
+        -------
+        np.ndarray
+            Unormalized plate image
+        np.ndarray
+            Unsorted points
+        """
+        img = cv2.resize(img, (1280, 1280*img.shape[0]//img.shape[1]))
         gray_org = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         gray_org = cv2.bilateralFilter(gray_org, 11, 17, 17)
         tresh = cv2.threshold(gray_org, 120, 255, 0)[1]
 
         label_image = measure.label(tresh)
 
-        new_region = None
-        max_area = 0
+        screenCnt = None
 
-        for region in regionprops(label_image):
-            if region.area < 10000:
+        for i, region in enumerate(sorted(regionprops(label_image), key=lambda x: x.area, reverse=True)):
+            if region.area < 30000:
                 # if the region is so small then it's likely not a license plate
                 continue
 
             # the bounding box coordinates
             minRow, minCol, maxRow, maxCol = region.bbox
 
-            if 520/114*1.5 < (maxCol-minCol)/(maxRow-minRow) or 520/114*0.5 > (maxCol-minCol)/(maxRow-minRow) or minCol == 0 or minRow == 0:
+            if 520/114*1.8 < (maxCol-minCol)/(maxRow-minRow) or \
+                520/114*0.2 > (maxCol-minCol)/(maxRow-minRow) or \
+                (maxRow-minRow) > (maxCol-minCol) or \
+                    minCol == 0 or minRow == 0:
                 continue
 
-            if region.area > max_area:
-                max_area = region.area
-                new_region = region.bbox
-
-        if new_region is None:
-            return None, None
-
-        eq = gray_org[new_region[0]-5:new_region[2]+5, new_region[1]-5:new_region[3]+5]
-
-        edged = cv2.Canny(eq, 80, 200, apertureSize=3)
-        edged = cv2.morphologyEx(
-            edged, cv2.MORPH_CLOSE, np.ones((3, 3), dtype=np.float32))
-        cnts = cv2.findContours(
-            edged.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        cnts = imutils.grab_contours(cnts)
-        cnts = sorted(cnts, key=cv2.contourArea, reverse=True)
-
-        screenCnt = None
-
-        for c in cnts:
-            approx = cv2.approxPolyDP(c, 0.010 * cv2.arcLength(c, True), True)
-            if len(approx) == 4 and cv2.contourArea(c) > 2000:
-                screenCnt = approx[:, 0]
+            eq, screenCnt = self.try_get_contour(gray_org, region.bbox)
+            if screenCnt is not None:
                 break
 
         if screenCnt is None:
@@ -163,6 +202,20 @@ class PlateReader:
         return new_image, screenCnt
 
     def get_plate_from_image2(self, img: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """This method is more of a brute force type, it can find special cases.
+
+        Parameters
+        ----------
+        img : np.ndarray
+            Imput image
+
+        Returns
+        -------
+        np.ndarray
+            Unormalized plate image
+        np.ndarray
+            Unsorted points
+        """
         img = cv2.resize(img, (1280, 720))
         gray_org = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         gray_org = cv2.bilateralFilter(gray_org, 11, 17, 17)
@@ -212,7 +265,7 @@ class PlateReader:
 
         if screenCnt is None:
             return None, None
-        
+
         gray = cv2.resize(gray_org, None, fx=scale, fy=scale).copy()
         mask = np.zeros(gray.shape, np.uint8)
         new_image = cv2.drawContours(mask, [screenCnt], 0, 255, -1,)
