@@ -1,8 +1,8 @@
 """
     Author: Bartosz Ptak - 2020
 
-    It is a project for the subject of Vision Systems conducted at the Poznan 
-    University of Technology, specializing in Robots and Autonomous Systems.
+    It is a project for the subject of Vision Systems conducted at Robots and Autonomous Systems
+    specialization at the Poznan University of Technology.
 
     Task:
         Writing a program without using machine learning:
