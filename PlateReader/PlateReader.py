@@ -7,6 +7,8 @@ import cv2
 import os
 from typing import Tuple, List
 from scipy.spatial.distance import cdist
+from skimage import measure
+from skimage.measure import regionprops
 import string
 import imutils
 
@@ -23,7 +25,7 @@ class PlateReader:
         plate_size
             This is the size of the license plates (official size in mm), default 520x114 mm
         plate_numbers
-
+            Number of characters on the license plate (here fixed 7)
         char_size
             The size of one character to which each of them will be normalized
         char_base
@@ -78,6 +80,21 @@ class PlateReader:
 
         plate, pkt = self.get_plate_from_image(img)
 
+        if plate is None:
+            plate, pkt = self.get_plate_from_image2(img)
+
+            if plate is None:
+                # print('Żadna z nich')
+                return self.check_character_dependencies([])
+        #     else:
+
+        #         print('Metoda 2')
+        # else:
+        #     print('Metoda 1')
+        
+        # cv2.imshow('a', plate)
+        # cv2.waitKey(0)
+
         pkt = self.order_points(pkt)
         plate = self.normalize_plate_size(plate, pkt)
         plate = self.less_dummy_threshold(plate)
@@ -89,7 +106,63 @@ class PlateReader:
 
         return result
 
-    def get_plate_from_image(self, img: np.ndarray):
+    def get_plate_from_image(self, img: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        img = cv2.resize(img, (1280, 960))
+        gray_org = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        gray_org = cv2.bilateralFilter(gray_org, 11, 17, 17)
+        tresh = cv2.threshold(gray_org, 120, 255, 0)[1]
+
+        label_image = measure.label(tresh)
+
+        new_region = None
+        max_area = 0
+
+        for region in regionprops(label_image):
+            if region.area < 10000:
+                # if the region is so small then it's likely not a license plate
+                continue
+
+            # the bounding box coordinates
+            minRow, minCol, maxRow, maxCol = region.bbox
+
+            if 520/114*1.5 < (maxCol-minCol)/(maxRow-minRow) or 520/114*0.5 > (maxCol-minCol)/(maxRow-minRow) or minCol == 0 or minRow == 0:
+                continue
+
+            if region.area > max_area:
+                max_area = region.area
+                new_region = region.bbox
+
+        if new_region is None:
+            return None, None
+
+        eq = gray_org[new_region[0]-5:new_region[2]+5, new_region[1]-5:new_region[3]+5]
+
+        edged = cv2.Canny(eq, 80, 200, apertureSize=3)
+        edged = cv2.morphologyEx(
+            edged, cv2.MORPH_CLOSE, np.ones((3, 3), dtype=np.float32))
+        cnts = cv2.findContours(
+            edged.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        cnts = imutils.grab_contours(cnts)
+        cnts = sorted(cnts, key=cv2.contourArea, reverse=True)
+
+        screenCnt = None
+
+        for c in cnts:
+            approx = cv2.approxPolyDP(c, 0.010 * cv2.arcLength(c, True), True)
+            if len(approx) == 4 and cv2.contourArea(c) > 2000:
+                screenCnt = approx[:, 0]
+                break
+
+        if screenCnt is None:
+            return None, None
+
+        mask = np.zeros(eq.shape, np.uint8)
+        new_image = cv2.drawContours(mask, [screenCnt], 0, 255, -1,)
+        new_image = cv2.bitwise_and(eq, eq, mask=mask)
+
+        return new_image, screenCnt
+
+    def get_plate_from_image2(self, img: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         img = cv2.resize(img, (1280, 720))
         gray_org = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         gray_org = cv2.bilateralFilter(gray_org, 11, 17, 17)
@@ -113,7 +186,7 @@ class PlateReader:
             cnts = cv2.findContours(
                 edged.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
             cnts = imutils.grab_contours(cnts)
-            cnts = sorted(cnts, key=cv2.contourArea, reverse=True)[:10]
+            cnts = sorted(cnts, key=cv2.contourArea, reverse=True)
 
             for c in cnts:
                 approx = cv2.approxPolyDP(
@@ -138,13 +211,12 @@ class PlateReader:
                 break
 
         if screenCnt is None:
-            screenCnt = np.zeros((4, 2))
-            new_image = np.zeros((400, 321), dtype=np.uint8)
-        else:
-            gray = cv2.resize(gray_org, None, fx=scale, fy=scale).copy()
-            mask = np.zeros(gray.shape, np.uint8)
-            new_image = cv2.drawContours(mask, [screenCnt], 0, 255, -1,)
-            new_image = cv2.bitwise_and(gray, gray, mask=mask)
+            return None, None
+        
+        gray = cv2.resize(gray_org, None, fx=scale, fy=scale).copy()
+        mask = np.zeros(gray.shape, np.uint8)
+        new_image = cv2.drawContours(mask, [screenCnt], 0, 255, -1,)
+        new_image = cv2.bitwise_and(gray, gray, mask=mask)
 
         return new_image, screenCnt
 
@@ -299,7 +371,8 @@ class PlateReader:
         Returns
         -------
         List
-            List of dicts like {'char': 'P, 'left' True}. Left is true if the char is befor the sticker
+            List of dicts like {'char': 'P, 'left' True}. Left is true if the char is befor 
+            the sticker
 
         Algorithm:
              - Calculates the cosine similarity between input and pattern.
@@ -313,7 +386,7 @@ class PlateReader:
         flag = True
         for i, (ch, d) in enumerate(zip(res.T[-self.plate_numbers:], dists[-self.plate_numbers:])):
             if (flag and i > 2) or i < 3:
-                flag = d < 85
+                flag = d < 90
 
             plate.append({
                 'char': self.char_targets[ch.argmin()].upper(),
@@ -324,7 +397,7 @@ class PlateReader:
 
     def check_character_dependencies(self, plate: List) -> str:
         """Check character dependencies. The characters before the sticker are reserved. If too few
-        characters were read, fill in with "_".
+        characters were read, fill in with "?".
 
         Parameters
         ----------
@@ -338,12 +411,12 @@ class PlateReader:
         """
 
         results = ''
-        for p in plate:
-            if p['left'] and p['char'] in self.dep_left:
-                results += self.dep_left[p['char']]
-            elif not p['left'] and p['char'] in self.dep_right:
-                results += self.dep_right[p['char']]
+        for i, p in enumerate(plate):
+            if (p['left'] and p['char'] in self.dep_left) and i < 2:
+                results += self.dep_left.get(p['char'], p['char'])
+            elif (not p['left'] and p['char'] in self.dep_right) and i > 2:
+                results += self.dep_right.get(p['char'], p['char'])
             else:
                 results += p['char']
 
-        return results.ljust(self.plate_numbers, '_')
+        return results.ljust(self.plate_numbers, '?')
