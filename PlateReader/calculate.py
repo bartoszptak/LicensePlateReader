@@ -47,6 +47,9 @@ def check(res: dict, gt: dict) -> None:
         print(
             f'Find acc: {readed/(len(res.items())-1):2f} ({readed} readed plates for {(len(res.items())-1)} total)'
         )
+        print(
+            f'OCR acc: {points/(readed*7):2f} ({points} readed chars for {readed*7} total)'
+        )
     except ZeroDivisionError:
         print(f'Accurancy: {0.00} ({points} good chars per {count} total)')
 

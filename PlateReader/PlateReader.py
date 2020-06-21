@@ -224,7 +224,7 @@ class PlateReader:
 
         cannies = [10, 30, 50, 80]
         approxies = np.arange(0.014, 0.020, 0.002)
-        scales = [1.0, 0.8, 0.5]
+        scales = [1.5, 1.0, 0.8, 0.5]
 
         cannies_c = 0
         approxies_c = 0
