@@ -15,9 +15,10 @@
         - images for max. 45 degrees
 
     Final results on private test set:
-        - Find bbox accurancy: 87.50% (42 readed plates for 48 total)
-        - Total accurancy: 83.97% (288 good chars per 343 total)
-        - Execution time: 10.32s (per 48 images)
+        - Find bbox accurancy: 91.67% (44 readed plates for 48 total)
+        - OCR accurancy: 97.78% (308 readed chars for 315 total)
+        - Total accurancy: 89.80% (308 good chars per 343 total)
+        - Execution time: 11.59s (per 48 images)
 """
 import numpy as np
 import cv2
@@ -129,6 +130,11 @@ class PlateReader:
         try:
             eq = gray_org[region[0]-5:region[2]+5, region[1]-5:region[3]+5]
 
+            # eq = cv2.addWeighted(eq, 1.5, eq, 0, 0)
+
+            eq = cv2.cvtColor(cv2.cvtColor(eq, cv2.COLOR_GRAY2BGR), cv2.COLOR_BGR2HSV)[:,:,2]
+            eq = cv2.GaussianBlur(eq, (5,5), 0)
+
             edged = cv2.Canny(eq, 80, 200, apertureSize=3)
             edged = cv2.morphologyEx(
                 edged, cv2.MORPH_CLOSE, np.ones((3, 3), dtype=np.float32))
@@ -137,12 +143,15 @@ class PlateReader:
             cnts = imutils.grab_contours(cnts)
             cnts = sorted(cnts, key=cv2.contourArea, reverse=True)
 
+            # cv2.imshow('a', edged)
+            # cv2.waitKey(200)
+
             screenCnt = None
 
             for c in cnts:
                 approx = cv2.approxPolyDP(
                     c, 0.010 * cv2.arcLength(c, True), True)
-                if len(approx) == 4 and cv2.contourArea(c) > 2000:
+                if len(approx) == 4 and cv2.contourArea(c) > 10000:
                     screenCnt = approx[:, 0]
                     break
 
@@ -168,15 +177,28 @@ class PlateReader:
         img = cv2.resize(img, (1280, 1280*img.shape[0]//img.shape[1]))
         gray_org = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         gray_org = cv2.bilateralFilter(gray_org, 11, 17, 17)
-        tresh = cv2.threshold(gray_org, 120, 255, 0)[1]
+        # tresh = cv2.threshold(gray_org, 120, 255, 0)[1]
 
+        blur = cv2.GaussianBlur(gray_org,(7,7),0)
+        # blur = cv2.GaussianBlur(blur,(5,5),0)
+        # blur = cv2.GaussianBlur(blur,(3,3),0)
+
+        blur[blur>110] = 255
+        blur = cv2.dilate(blur, np.ones((3,3), dtype=np.float32))
+
+        # cv2.imshow('a', blur)
+        # cv2.waitKey(0)
+        tresh = cv2.threshold(blur,0,255,cv2.THRESH_OTSU)[1]
+        # cv2.imshow('a', tresh)
+        # cv2.waitKey(0)
+        # exit(0)
+            
         label_image = measure.label(tresh)
 
         screenCnt = None
 
         for i, region in enumerate(sorted(regionprops(label_image), key=lambda x: x.area, reverse=True)):
             if region.area < 30000:
-                # if the region is so small then it's likely not a license plate
                 continue
 
             # the bounding box coordinates
@@ -184,13 +206,16 @@ class PlateReader:
 
             if 520/114*1.8 < (maxCol-minCol)/(maxRow-minRow) or \
                 520/114*0.2 > (maxCol-minCol)/(maxRow-minRow) or \
-                (maxRow-minRow) > (maxCol-minCol) or \
-                    minCol == 0 or minRow == 0:
+                (maxRow-minRow) > (maxCol-minCol):
                 continue
 
             eq, screenCnt = self.try_get_contour(gray_org, region.bbox)
             if screenCnt is not None:
                 break
+
+            # eq, screenCnt = self.try_get_contour(cv2.addWeighted(gray_org, 1.5, gray_org, 0, 0), region.bbox)
+            # if screenCnt is not None:
+            #     break
 
         if screenCnt is None:
             return None, None
@@ -218,12 +243,12 @@ class PlateReader:
         """
         img = cv2.resize(img, (1280, 720))
         gray_org = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        gray_org = cv2.bilateralFilter(gray_org, 11, 17, 17)
+        gray_org = cv2.bilateralFilter(gray_org, 11, 13, 13)
 
         screenCnt = None
 
         cannies = [10, 30, 50, 80]
-        approxies = np.arange(0.014, 0.020, 0.002)
+        approxies = np.arange(0.010, 0.018, 0.002)
         scales = [1.5, 1.0, 0.8, 0.5]
 
         cannies_c = 0
@@ -235,7 +260,8 @@ class PlateReader:
         while screenCnt is None:
             gray = cv2.resize(
                 gray_org, None, fx=scales[scales_c], fy=scales[scales_c]).copy()
-            edged = cv2.Canny(gray, cannies[cannies_c], 180)
+
+            edged = cv2.Canny(gray, cannies[cannies_c], 200)
             cnts = cv2.findContours(
                 edged.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
             cnts = imutils.grab_contours(cnts)
@@ -387,7 +413,7 @@ class PlateReader:
             if cv2.contourArea(ctr) > 900:
                 x, y, w, h = cv2.boundingRect(ctr)
 
-                roi = plate[y-1:y+h+1, x-1:x+w+1]
+                roi = plate[y-2:y+h+2, x-2:x+w+2]
                 roi = cv2.resize(roi, self.char_size)
                 roi = cv2.erode(roi, np.ones((3, 3)))
                 roi = cv2.threshold(roi, self.char_tresh,
@@ -468,6 +494,10 @@ class PlateReader:
             if (p['left'] and p['char'] in self.dep_left) and i < 2:
                 results += self.dep_left.get(p['char'], p['char'])
             elif (not p['left'] and p['char'] in self.dep_right) and i > 2:
+                results += self.dep_right.get(p['char'], p['char'])
+            elif (p['char'] in self.dep_left) and i < 2:
+                results += self.dep_left.get(p['char'], p['char'])
+            elif (p['char'] in self.dep_right) and i > 2:
                 results += self.dep_right.get(p['char'], p['char'])
             else:
                 results += p['char']
